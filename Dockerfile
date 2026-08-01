@@ -1,4 +1,4 @@
-# Obsidian in Docker — browser access via noVNC, vaults me/raw + me/wiki
+# Obsidian in Docker — headless HTTP service (Local REST API), vaults me/raw + me/wiki
 # Builds for amd64 (latest/amd64) and arm64 (arch64) via CI.
 
 ARG DOCKER_GID=998
@@ -15,10 +15,6 @@ ENV OBSIDIAN_VERSION=1.13.4
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     xvfb \
-    fluxbox \
-    x11vnc \
-    novnc \
-    websockify \
     curl \
     ca-certificates \
     # Electron runtime libraries
@@ -48,13 +44,14 @@ RUN if [ "$TARGETARCH" = "amd64" ]; then \
     curl -fsSL "$URL" -o /tmp/obsidian.tar.gz && \
     mkdir -p /opt/obsidian && tar -xzf /tmp/obsidian.tar.gz -C /opt/obsidian && rm /tmp/obsidian.tar.gz
 
+# Local REST API plugin (Hermes <-> Obsidian over pure HTTP, port 27123)
 COPY obsidian-local-rest-api/ /opt/obsidian-local-rest-api/
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
-EXPOSE 6080 27123
+EXPOSE 27123
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
-  CMD curl -fsS http://localhost:6080/ >/dev/null || exit 1
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+  CMD curl -s -o /dev/null http://localhost:27123/ || exit 1
 
 CMD ["/entrypoint.sh"]

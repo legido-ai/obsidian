@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
-# Obsidian container entrypoint:
+# Obsidian container entrypoint (headless HTTP service):
 #   - creates the me/raw and me/wiki vaults (idempotent)
 #   - registers both vaults in Obsidian's config (persisted on the /data volume)
 #   - seeds the Local REST API plugin into the wiki vault (API key from
 #     $OBSIDIAN_API_KEY or auto-generated, persisted in the vault config)
-#   - starts Xvfb + fluxbox + x11vnc + noVNC (websockify) and launches Obsidian
+#   - starts Xvfb (headless display) and Obsidian; the vault is served over
+#     pure HTTP on port 27123 by the Local REST API plugin
 set -e
 
 DATA_DIR="${DATA_DIR:-/data}"
@@ -56,35 +57,15 @@ EOF
   echo '["obsidian-local-rest-api"]' > "$WIKI_VAULT/.obsidian/community-plugins.json"
 fi
 
-# --- VNC password ---------------------------------------------------------
-VNC_PASS_FILE="$DATA_DIR/.vncpass"
-if [ -n "$VNC_PASSWORD" ]; then
-  echo "$VNC_PASSWORD" > "$VNC_PASS_FILE"
-  chmod 600 "$VNC_PASS_FILE"
-fi
-if [ ! -f "$VNC_PASS_FILE" ]; then
-  GEN_PASS=$(tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 16)
-  echo "$GEN_PASS" > "$VNC_PASS_FILE"
-  chmod 600 "$VNC_PASS_FILE"
-  echo "[obsidian] VNC password generated on first boot: $GEN_PASS (persisted in $VNC_PASS_FILE; set VNC_PASSWORD env to override)"
-fi
-
-# --- Display stack --------------------------------------------------------
+# --- Headless display + Obsidian -------------------------------------------
 export DISPLAY=:0
 export XDG_CONFIG_HOME="$CONFIG_HOME"
 export HOME="${HOME:-/root}"
 
-Xvfb :0 -screen 0 1600x1000x24 -nolisten tcp &
+Xvfb :0 -screen 0 1280x800x24 -nolisten tcp &
 XVFB_PID=$!
 sleep 1
 
-fluxbox >/dev/null 2>&1 &
-x11vnc -display :0 -forever -shared -rfbport 5900 -passwdfile "$VNC_PASS_FILE" -noxdamage >/dev/null 2>&1 &
-X11VNC_PID=$!
-websockify --web /usr/share/novnc 6080 localhost:5900 >/dev/null 2>&1 &
-WS_PID=$!
-
-# --- Obsidian -------------------------------------------------------------
 OBSIDIAN_BIN=$(find /opt/obsidian -maxdepth 3 -type f -name obsidian 2>/dev/null | head -1)
 if [ -z "$OBSIDIAN_BIN" ]; then
   echo "[obsidian] ERROR: obsidian binary not found under /opt/obsidian" >&2
@@ -93,11 +74,11 @@ fi
 chmod +x "$OBSIDIAN_BIN"
 
 cleanup() {
-  kill "$OBS_PID" "$WS_PID" "$X11VNC_PID" "$XVFB_PID" 2>/dev/null || true
+  kill "$OBS_PID" "$XVFB_PID" 2>/dev/null || true
 }
 trap cleanup TERM INT
 
-echo "[obsidian] starting Obsidian ($OBSIDIAN_BIN) with vault $WIKI_VAULT"
-"$OBSIDIAN_BIN" --no-sandbox "$WIKI_VAULT" >/dev/null 2>&1 &
+echo "[obsidian] starting Obsidian headless ($OBSIDIAN_BIN) with vault $WIKI_VAULT (HTTP API on :27123)"
+"$OBSIDIAN_BIN" --no-sandbox --disable-gpu "$WIKI_VAULT" >/dev/null 2>&1 &
 OBS_PID=$!
 wait "$OBS_PID"
