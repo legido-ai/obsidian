@@ -37,9 +37,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Download Obsidian for the build architecture (buildx sets TARGETARCH).
+# Asset naming: arm64 tarball has an -arm64 suffix; the amd64 tarball does not.
 ARG TARGETARCH
-ADD https://github.com/obsidianmd/obsidian-releases/releases/download/v${OBSIDIAN_VERSION}/obsidian-${OBSIDIAN_VERSION}-${TARGETARCH}.tar.gz /tmp/obsidian.tar.gz
-RUN mkdir -p /opt/obsidian && tar -xzf /tmp/obsidian.tar.gz -C /opt/obsidian && rm /tmp/obsidian.tar.gz
+RUN if [ "$TARGETARCH" = "amd64" ]; then \
+      URL="https://github.com/obsidianmd/obsidian-releases/releases/download/v${OBSIDIAN_VERSION}/obsidian-${OBSIDIAN_VERSION}.tar.gz"; \
+    else \
+      URL="https://github.com/obsidianmd/obsidian-releases/releases/download/v${OBSIDIAN_VERSION}/obsidian-${OBSIDIAN_VERSION}-${TARGETARCH}.tar.gz"; \
+    fi; \
+    echo "[obsidian] downloading $URL"; \
+    curl -fsSL "$URL" -o /tmp/obsidian.tar.gz && \
+    mkdir -p /opt/obsidian && tar -xzf /tmp/obsidian.tar.gz -C /opt/obsidian && rm /tmp/obsidian.tar.gz
 
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
