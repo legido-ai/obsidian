@@ -11,26 +11,30 @@ Obsidian runs headless in a Docker container (Xvfb, no GUI exposed) and serves t
 
 Both vaults are created automatically on first boot and registered in Obsidian's vault switcher.
 
-## HTTP API
+## HTTP API (vault API)
 
-The container listens on port `27123` (internal only — deployed on `network-docker-agent`, the network shared with Hermes and docker-agent; no public exposure).
+The container exposes a minimal authenticated HTTP API on port `27123` (internal only — deployed on `network-docker-agent`, the network shared with Hermes and docker-agent; no public exposure). It serves the vault data directly; Obsidian runs headless and picks up file changes automatically.
 
 - **Auth:** `Authorization: Bearer <OBSIDIAN_API_KEY>`
-- **Key source:** `$OBSIDIAN_API_KEY` env var at first boot; otherwise auto-generated and persisted in `/data/me/wiki/.obsidian/plugins/obsidian-local-rest-api/data.json` (copy at `/data/.obsidian-api-key`)
+- **Key source:** `$OBSIDIAN_API_KEY` env var at first boot; otherwise auto-generated and persisted in `/data/.obsidian-api-key`
 
-Useful endpoints (plugin v5):
+Endpoints:
 
-- `GET /vault/` — list all files in the vault
-- `GET /vault/<path>` / `PUT /vault/<path>` / `DELETE /vault/<path>` — read/write/delete notes
-- `POST /command/` — execute Obsidian commands
-- `GET /active-note/` — current note
-- `POST /search/` — full-text search
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/` | Service info + vault list (`me/raw`, `me/wiki`) |
+| `GET` | `/vault/<path>` | File contents (bytes) or directory listing (JSON) |
+| `PUT` | `/vault/<path>` | Create/overwrite a file (body = file bytes) |
+| `DELETE` | `/vault/<path>` | Delete a file (or empty directory) |
 
 Example from the Hermes terminal:
 
 ```bash
 curl -H "Authorization: Bearer $OBSIDIAN_API_KEY" http://<container-ip>:27123/vault/
+curl -X PUT -H "Authorization: Bearer $OBSIDIAN_API_KEY" --data-binary "# Note" http://<container-ip>:27123/vault/me/wiki/hello.md
 ```
+
+The official Local REST API plugin is also pre-seeded in the wiki vault (`obsidian-local-rest-api`, same port/key) — it activates if restricted mode is ever disabled in the Obsidian UI, adding search/commands/MCP endpoints.
 
 ## Persistence
 

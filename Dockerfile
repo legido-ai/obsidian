@@ -16,6 +16,7 @@ ENV OBSIDIAN_VERSION=1.13.4
 RUN apt-get update && apt-get install -y --no-install-recommends \
     xvfb \
     curl \
+    python3 \
     ca-certificates \
     # Electron runtime libraries
     libgtk-3-0 \
@@ -44,7 +45,9 @@ RUN if [ "$TARGETARCH" = "amd64" ]; then \
     curl -fsSL "$URL" -o /tmp/obsidian.tar.gz && \
     mkdir -p /opt/obsidian && tar -xzf /tmp/obsidian.tar.gz -C /opt/obsidian && rm /tmp/obsidian.tar.gz
 
-# Local REST API plugin (Hermes <-> Obsidian over pure HTTP, port 27123)
+# Vault HTTP API (Hermes <-> Obsidian over pure HTTP, port 27123)
+COPY vault_api.py /vault_api.py
+# Local REST API plugin (optional; requires disabling restricted mode in the UI)
 COPY obsidian-local-rest-api/ /opt/obsidian-local-rest-api/
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
