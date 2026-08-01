@@ -273,6 +273,20 @@ class Handler(BaseHTTPRequestHandler):
             return []
         return [p for p in WIKI.rglob("*.md") if ".obsidian" not in p.parts]
 
+    def _all_notes(self):
+        root = DATA / "me"
+        if not root.exists():
+            return []
+        return [p for p in root.rglob("*.md") if ".obsidian" not in p.parts]
+
+    def _note_href(self, p):
+        rel = p.relative_to(DATA).as_posix()
+        for area in ("wiki", "questions", "digests", "raw"):
+            prefix = f"me/{area}/"
+            if rel.startswith(prefix):
+                return f"/{area}/" + rel[len(prefix):]
+        return "/wiki/" + urllib.parse.quote(p.name)
+
     def _index(self):
         notes = self._wiki_notes()
         raws = [p for p in RAW.rglob("*") if p.is_file()] if RAW.exists() else []
@@ -291,7 +305,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def _tags(self, tag):
         all_tags = {}
-        for p in self._wiki_notes():
+        for p in self._all_notes():
             for t in extract_tags(p.read_text(errors="replace")):
                 all_tags.setdefault(t, []).append(p)
         if not tag:
@@ -302,7 +316,7 @@ class Handler(BaseHTTPRequestHandler):
         else:
             ps = all_tags.get(tag, [])
             body = f"<h1>#{tag}</h1>" + ("".join(
-                f'<div class="note">📄 <a href="/wiki/{urllib.parse.quote(p.relative_to(WIKI).as_posix())}">{p.relative_to(WIKI).as_posix()}</a></div>'
+                f'<div class="note">📄 <a href="{self._note_href(p)}">{p.relative_to(DATA).as_posix()}</a></div>'
                 for p in sorted(ps, key=lambda p: p.stat().st_mtime, reverse=True))
                 or "<p><em>No hay notas con este tag</em></p>")
             self._send(200, page(f"#{tag}", body).encode())
