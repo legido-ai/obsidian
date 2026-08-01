@@ -11,23 +11,26 @@ Obsidian runs headless in a Docker container (Xvfb, no GUI exposed) and serves t
 
 Both vaults are created automatically on first boot and registered in Obsidian's vault switcher.
 
-## HTTP API (vault API)
+## HTTP API + public wiki UI
 
-The container exposes a minimal authenticated HTTP API on port `27123` (internal only — deployed on `network-docker-agent`, the network shared with Hermes and docker-agent; no public exposure). It serves the vault data directly; Obsidian runs headless and picks up file changes automatically.
+The container exposes port `27123` with two faces:
 
-- **Auth:** `Authorization: Bearer <OBSIDIAN_API_KEY>`
-- **Key source:** `$OBSIDIAN_API_KEY` env var at first boot; otherwise auto-generated and persisted in `/data/.obsidian-api-key`
+**Public wiki UI (no auth)** — the consultable interface:
 
-Endpoints:
+- `GET /` — index (latest notes + sources)
+- `GET /wiki/` — rendered wiki index (README + all notes)
+- `GET /wiki/<topic>/<note>.md` — rendered note (markdown → HTML, `[[wikilinks]]` resolve)
+- `GET /raw/` and `GET /raw/<file>` — raw sources
 
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/` | Service info + vault list (`me/raw`, `me/wiki`) |
-| `GET` | `/vault/<path>` | File contents (bytes) or directory listing (JSON) |
-| `PUT` | `/vault/<path>` | Create/overwrite a file (body = file bytes) |
-| `DELETE` | `/vault/<path>` | Delete a file (or empty directory) |
+**Authenticated JSON API (Bearer key)** — for Hermes:
 
-Example from the Hermes terminal:
+- `GET /vault/<path>` — file contents or directory listing (`?recursive=1`)
+- `PUT /vault/<path>` — create/overwrite a file
+- `DELETE /vault/<path>` — delete a file
+
+Auth header: `Authorization: Bearer <OBSIDIAN_API_KEY>` (key at `/data/.obsidian-api-key`).
+
+Example:
 
 ```bash
 curl -H "Authorization: Bearer $OBSIDIAN_API_KEY" http://<container-ip>:27123/vault/
