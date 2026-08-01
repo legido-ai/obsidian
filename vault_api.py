@@ -69,9 +69,18 @@ def walk_files(root):
 def inline_md(text):
     t = htmlmod.escape(text)
     t = re.sub(r"`([^`]+)`", r"<code>\1</code>", t)
-    t = re.sub(r"\[([^\]]+)\]\((https?://[^)]+|/[^)]+)\)", r'<a href="\2">\1</a>', t)
-    t = re.sub(r"\[\[([^\]|]+)\|([^\]]+)\]\]", r'<a href="/wiki/\1.md">\2</a>', t)
-    t = re.sub(r"\[\[([^\]]+)\]\]", r'<a href="/wiki/\1.md">\1</a>', t)
+
+    def mdlink(m):
+        label, url = m.group(1), m.group(2)
+        if url.startswith("/"):
+            url = urllib.parse.quote(url)
+        return f'<a href="{url}">{label}</a>'
+
+    t = re.sub(r"\[([^\]]+)\]\((https?://[^)]+|/[^)]+)\)", mdlink, t)
+    t = re.sub(r"\[\[([^\]|]+)\|([^\]]+)\]\]",
+               lambda m: f'<a href="/wiki/{urllib.parse.quote(m.group(1))}.md">{m.group(2)}</a>', t)
+    t = re.sub(r"\[\[([^\]]+)\]\]",
+               lambda m: f'<a href="/wiki/{urllib.parse.quote(m.group(1))}.md">{m.group(1)}</a>', t)
     t = re.sub(r"\*\*([^*]+)\*\*", r"<strong>\1</strong>", t)
     t = re.sub(r"(?<!\*)\*([^*\n]+)\*(?!\*)", r"<em>\1</em>", t)
     return t
@@ -128,10 +137,11 @@ def page(title, body_html, breadcrumb=""):
 def listing_html(entries, base_url, header):
     items = []
     for rel, p in sorted(entries):
+        href = base_url + urllib.parse.quote(rel)
         if p.is_dir():
-            items.append(f'<div class="note">📁 <a href="{base_url}{rel}/">{rel}/</a></div>')
+            items.append(f'<div class="note">📁 <a href="{href}/">{rel}/</a></div>')
         else:
-            items.append(f'<div class="note">📄 <a href="{base_url}{rel}">{rel}</a> <span class="meta">({p.stat().st_size} B)</span></div>')
+            items.append(f'<div class="note">📄 <a href="{href}">{rel}</a> <span class="meta">({p.stat().st_size} B)</span></div>')
     return f"<h1>{header}</h1>" + ("".join(items) if items else "<p><em>vacío</em></p>")
 
 
@@ -182,7 +192,7 @@ class Handler(BaseHTTPRequestHandler):
         if rel == "" or rel.endswith("/"):
             target = WIKI / rel
             if target.is_dir():
-                entries = [(p.relative_to(DATA).as_posix(), p) for p in sorted(target.iterdir())]
+                entries = [(x.name, x) for x in sorted(target.iterdir())]
                 # if README.md exists in this dir, render it on top
                 extra = ""
                 readme = target / "README.md"
@@ -194,7 +204,7 @@ class Handler(BaseHTTPRequestHandler):
         if rp is None:
             return self._send(400, page("400", "<p>Ruta inválida</p>").encode())
         if rp.is_dir():
-            entries = [(p.relative_to(DATA).as_posix(), p) for p in sorted(rp.iterdir())]
+            entries = [(x.name, x) for x in sorted(rp.iterdir())]
             return self._send(200, page(f"wiki/{rel}", listing_html(entries, "/wiki/", f"📖 wiki/{rel}")).encode())
         if rp.is_file():
             if rp.suffix == ".md":
@@ -208,7 +218,7 @@ class Handler(BaseHTTPRequestHandler):
         if rel == "" or rel.endswith("/"):
             target = RAW / rel
             if target.is_dir():
-                entries = [(p.relative_to(DATA).as_posix(), p) for p in sorted(target.iterdir())]
+                entries = [(x.name, x) for x in sorted(target.iterdir())]
                 return self._send(200, page(f"raw/{rel}", listing_html(entries, "/raw/", f"🗂 raw/{rel}")).encode())
             return self._send(404, page("404", "<p>No encontrado</p>").encode())
         rp = safe_path("me/raw/" + rel)
