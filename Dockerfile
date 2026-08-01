@@ -48,10 +48,11 @@ RUN if [ "$TARGETARCH" = "amd64" ]; then \
     curl -fsSL "$URL" -o /tmp/obsidian.tar.gz && \
     mkdir -p /opt/obsidian && tar -xzf /tmp/obsidian.tar.gz -C /opt/obsidian && rm /tmp/obsidian.tar.gz
 
+COPY obsidian-local-rest-api/ /opt/obsidian-local-rest-api/
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
-EXPOSE 6080
+EXPOSE 6080 27123
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
   CMD curl -fsS http://localhost:6080/ >/dev/null || exit 1
