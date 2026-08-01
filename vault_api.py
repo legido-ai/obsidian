@@ -261,7 +261,7 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/raw/" or path.startswith("/raw/"):
             return self._area("me/raw", "raw", path[len("/raw/"):])
         if path == "/questions/" or path.startswith("/questions/"):
-            return self._area("me/questions", "questions", path[len("/questions/"):])
+            return self._questions(path[len("/questions/"):])
         if path == "/digests/" or path.startswith("/digests/"):
             return self._area("me/digests", "digests", path[len("/digests/"):])
         if path.startswith("/vault/"):
@@ -331,6 +331,34 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(200, page(rp.stem, body, f" · <a href=\"/wiki/{urllib.parse.quote(rp.parent.relative_to(WIKI).as_posix())}/\">subir</a>").encode())
             return self._send(200, rp.read_bytes(), "application/octet-stream")
         return self._send(404, page("404", "<p>Nota no encontrada</p>").encode())
+
+    def _questions(self, rel):
+        root = DATA / "me/questions"
+        if rel and rel != "":
+            # serve a question note rendered (frontmatter -> header card)
+            rp = safe_path("me/questions/" + rel)
+            if rp is not None and rp.is_file() and rp.suffix == ".md":
+                return self._send(200, page(rp.stem, render_md(rp.read_text(errors="replace"))).encode())
+            return self._area("me/questions", "questions", rel)
+        if not root.is_dir():
+            return self._send(404, page("404", "<p>No encontrado</p>").encode())
+        entries = [(x.name, x) for x in sorted(root.iterdir())]
+        open_qs, answered_qs = [], []
+        for name, p in entries:
+            if p.is_file() and p.suffix == ".md" and name != "README.md":
+                tags = extract_tags(p.read_text(errors="replace"))
+                (answered_qs if "answered" in tags else open_qs).append((name, p))
+        extra = ""
+        readme = root / "README.md"
+        if readme.is_file():
+            extra = render_md(readme.read_text(errors="replace"))
+        items = "".join(
+            f'<div class="note">❓ <a href="/questions/{urllib.parse.quote(name)}">{name}</a></div>'
+            for name, _ in open_qs) or "<p><em>No open questions</em></p>"
+        body = (extra + f"<h1>❓ Open questions ({len(open_qs)})</h1>" + items
+                + f'<p class="meta"><a href="/tags/answered">✅ Answered ({len(answered_qs)})</a> · '
+                  f'<a href="/tags/open">#open</a> · <a href="/tags/question">#question</a></p>')
+        self._send(200, page("questions", body).encode())
 
     def _area(self, vault_rel, label, rel):
         root = DATA / vault_rel
