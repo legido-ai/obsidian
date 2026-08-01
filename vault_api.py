@@ -219,7 +219,7 @@ def render_body(md_text):
 def page(title, body_html, breadcrumb=""):
     return f"""<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{htmlmod.escape(title)}</title><style>{CSS}</style></head><body>
-<div class="breadcrumb"><a href="/">🏠 índice</a>{breadcrumb}</div>
+<div class="breadcrumb"><a href="/" onclick="if(history.length&gt;1){{event.preventDefault();history.back()}}">← back</a> · <a href="/">🏠 índice</a>{breadcrumb}</div>
 {body_html}</body></html>"""
 
 
