@@ -69,7 +69,7 @@ def walk_files(root):
 def inline_md(text):
     t = htmlmod.escape(text)
     t = re.sub(r"`([^`]+)`", r"<code>\1</code>", t)
-    t = re.sub(r"\[([^\]]+)\]\((https?://[^)]+)\)", r'<a href="\2">\1</a>', t)
+    t = re.sub(r"\[([^\]]+)\]\((https?://[^)]+|/[^)]+)\)", r'<a href="\2">\1</a>', t)
     t = re.sub(r"\[\[([^\]|]+)\|([^\]]+)\]\]", r'<a href="/wiki/\1.md">\2</a>', t)
     t = re.sub(r"\[\[([^\]]+)\]\]", r'<a href="/wiki/\1.md">\1</a>', t)
     t = re.sub(r"\*\*([^*]+)\*\*", r"<strong>\1</strong>", t)
