@@ -259,7 +259,11 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/wiki/" or path.startswith("/wiki/"):
             return self._wiki(path[len("/wiki/"):])
         if path == "/raw/" or path.startswith("/raw/"):
-            return self._raw(path[len("/raw/"):])
+            return self._area("me/raw", "raw", path[len("/raw/"):])
+        if path == "/questions/" or path.startswith("/questions/"):
+            return self._area("me/questions", "questions", path[len("/questions/"):])
+        if path == "/digests/" or path.startswith("/digests/"):
+            return self._area("me/digests", "digests", path[len("/digests/"):])
         if path.startswith("/vault/"):
             return self._vault_api(u)
         return self._json(404, {"error": "not found"})
@@ -273,7 +277,8 @@ class Handler(BaseHTTPRequestHandler):
         notes = self._wiki_notes()
         raws = [p for p in RAW.rglob("*") if p.is_file()] if RAW.exists() else []
         body = f"<h1>📚 Wiki de investigación</h1><p class=\"meta\">{len(notes)} notas · {len(raws)} fuentes en bruto</p>"
-        body += f'<p><a href="/wiki/">📖 Ver wiki ({len(notes)} notas)</a> · <a href="/raw/">🗂 Ver raw ({len(raws)} fuentes)</a> · <a href="/tags/">🏷 Tags</a></p>'
+        body += (f'<p><a href="/wiki/">📖 Ver wiki ({len(notes)} notas)</a> · <a href="/raw/">🗂 Ver raw ({len(raws)} fuentes)</a>'
+                 f' · <a href="/questions/">❓ questions</a> · <a href="/digests/">📅 digests</a> · <a href="/tags/">🏷 Tags</a></p>')
         body += "<h2>Últimas notas</h2>"
         recent = sorted(notes, key=lambda p: p.stat().st_mtime, reverse=True)[:10]
         body += "".join(f'<div class="note">📄 <a href="/wiki/{urllib.parse.quote(p.relative_to(WIKI).as_posix())}">{p.relative_to(WIKI).as_posix()}</a></div>'
@@ -327,14 +332,19 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(200, rp.read_bytes(), "application/octet-stream")
         return self._send(404, page("404", "<p>Nota no encontrada</p>").encode())
 
-    def _raw(self, rel):
+    def _area(self, vault_rel, label, rel):
+        root = DATA / vault_rel
         if rel == "" or rel.endswith("/"):
-            target = RAW / rel
+            target = root / rel
             if target.is_dir():
                 entries = [(x.name, x) for x in sorted(target.iterdir())]
-                return self._send(200, page(f"raw/{rel}", listing_html(entries, "/raw/", f"🗂 raw/{rel}")).encode())
+                extra = ""
+                readme = target / "README.md"
+                if readme.is_file():
+                    extra = render_md(readme.read_text(errors="replace"))
+                return self._send(200, page(f"{label}/{rel}", extra + listing_html(entries, f"/{label}/", f"{label}/{rel}")).encode())
             return self._send(404, page("404", "<p>No encontrado</p>").encode())
-        rp = safe_path("me/raw/" + rel)
+        rp = safe_path(vault_rel + "/" + rel)
         if rp is not None and rp.is_file():
             return self._send(200, rp.read_bytes(), "text/plain; charset=utf-8" if rp.suffix == ".md" else "application/octet-stream")
         return self._send(404, page("404", "<p>No encontrado</p>").encode())
