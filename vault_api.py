@@ -250,7 +250,7 @@ class Handler(BaseHTTPRequestHandler):
         u = urllib.parse.urlparse(self.path)
         if not u.path.startswith("/vault/"):
             return self._json(404, {"error": "not found"})
-        rp = safe_path(u.path[len("/vault/"):])
+        rp = safe_path(urllib.parse.unquote(u.path[len("/vault/"):]))
         if rp is None:
             return self._json(400, {"error": "invalid path"})
         if rp.exists() and rp.is_dir():
@@ -267,7 +267,7 @@ class Handler(BaseHTTPRequestHandler):
         u = urllib.parse.urlparse(self.path)
         if not u.path.startswith("/vault/"):
             return self._json(404, {"error": "not found"})
-        rp = safe_path(u.path[len("/vault/"):])
+        rp = safe_path(urllib.parse.unquote(u.path[len("/vault/"):]))
         if rp is None:
             return self._json(400, {"error": "invalid path"})
         if not rp.exists():
