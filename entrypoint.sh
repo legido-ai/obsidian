@@ -112,8 +112,11 @@ OBS_PID=$!
 log "Obsidian started (pid $OBS_PID)"
 
 # --- Activate the plugin: disable Restricted Mode via obsidian-cli ----------
-CLI_BIN="/opt/obsidian/obsidian-cli"
+# The tarball extracts to a per-arch subdirectory (obsidian-1.13.4/ on amd64,
+# obsidian-1.13.4-arm64/ on arm64), so locate the CLI dynamically like the app.
+CLI_BIN=$(find /opt/obsidian -maxdepth 3 -type f -name obsidian-cli 2>/dev/null | head -1)
 if [ -x "$CLI_BIN" ]; then
+  log "obsidian-cli: $CLI_BIN"
   log "disabling Restricted Mode via obsidian-cli (up to 30 tries)"
   for i in $(seq 1 30); do
     if OUT=$("$CLI_BIN" plugins:restrict off 2>&1); then
