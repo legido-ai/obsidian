@@ -1,43 +1,40 @@
 # Obsidian in Docker (headless HTTP service)
 
-Obsidian runs headless in a Docker container (Xvfb, no GUI exposed) and serves the wiki vault over **pure HTTP** via the [Local REST API](https://github.com/coddingtonbear/obsidian-local-rest-api) plugin. Hermes (and any container on the shared docker network) talks to it with plain HTTP requests.
+Obsidian runs headless in a Docker container (Xvfb framebuffer, no GUI exposed) and serves the wiki vault over **pure HTTP** via the official [Local REST API](https://github.com/coddingtonbear/obsidian-local-rest-api) plugin. **Obsidian is only a store + HTTP surface — all logic lives in the Hermes `obsidian-ingest` skill** (raw → wiki synthesis, wikilinks, index). No custom code, no server-side rendering, no formatting decisions in this container.
 
 ## Vaults
 
-| Vault | Path | Purpose |
-|-------|------|---------|
-| `me/raw` | `/data/me/raw` | Raw source documents: PDFs, videos, transcriptions, links, etc. |
-| `me/wiki` | `/data/me/wiki` | Markdown wiki generated from the raw documents (served over HTTP) |
+- `me/raw` (`/data/me/raw`) — raw source documents: PDFs, videos, transcriptions, links, etc. (append-only)
+- `me/wiki` (`/data/me/wiki`) — markdown wiki generated from the raw documents by the Hermes skill
 
-Both vaults are created automatically on first boot and registered in Obsidian's vault switcher.
+Both are created automatically on first boot and registered in Obsidian's vault switcher.
 
-## HTTP API + public wiki UI
+## HTTP surface (the Local REST API plugin)
 
-The container exposes port `27123` with two faces:
+The container exposes port `27123` with the official plugin's API. All requests use the Bearer key at `/data/.obsidian-api-key` (or `$OBSIDIAN_API_KEY`):
 
-**Public wiki UI (no auth)** — the consultable interface:
-
-- `GET /` — index (latest notes + sources)
-- `GET /wiki/` — rendered wiki index (README + all notes)
-- `GET /wiki/<topic>/<note>.md` — rendered note (markdown → HTML, `[[wikilinks]]` resolve)
-- `GET /raw/` and `GET /raw/<file>` — raw sources
-
-**Authenticated JSON API (Bearer key)** — for Hermes:
-
-- `GET /vault/<path>` — file contents or directory listing (`?recursive=1`)
+- `GET /vault/<path>` — file contents or directory listing
 - `PUT /vault/<path>` — create/overwrite a file
 - `DELETE /vault/<path>` — delete a file
-
-Auth header: `Authorization: Bearer <OBSIDIAN_API_KEY>` (key at `/data/.obsidian-api-key`).
+- `GET /active`, `/search/...`, `/command` — plugin extras (search, commands, MCP)
 
 Example:
 
 ```bash
-curl -H "Authorization: Bearer $OBSIDIAN_API_KEY" http://<container-ip>:27123/vault/
-curl -X PUT -H "Authorization: Bearer $OBSIDIAN_API_KEY" --data-binary "# Note" http://<container-ip>:27123/vault/me/wiki/hello.md
+curl -H "Authorization: Bearer <key>" http://<container-ip>:27123/vault/
+curl -X PUT -H "Authorization: Bearer <key>" --data-binary "# Note" http://<container-ip>:27123/vault/me/wiki/hello.md
 ```
 
-The official Local REST API plugin is also pre-seeded in the wiki vault (`obsidian-local-rest-api`, same port/key) — it activates if restricted mode is ever disabled in the Obsidian UI, adding search/commands/MCP endpoints.
+### How the plugin activates with zero manual configuration
+
+Community plugins normally require disabling Obsidian's Restricted Mode in the UI. Here it is done programmatically, headlessly:
+
+1. The entrypoint seeds the plugin (`obsidian-local-rest-api`) + `community-plugins.json` + `data.json` (port 27123, key, crypto off → plain HTTP).
+2. Obsidian starts under Xvfb.
+3. The entrypoint runs the bundled **`obsidian-cli plugins:restrict off`** — `obsidian-cli` (shipped in the official tarball) talks to the running app over a unix socket and disables Restricted Mode; the app reloads and the plugin serves HTTP on 27123.
+4. The entrypoint waits until `/active` responds.
+
+No VNC, no browser, no manual configuration. Xvfb is only the invisible framebuffer the Electron app requires.
 
 ## Persistence
 
@@ -46,6 +43,7 @@ A docker volume is mounted at `/data`:
 - `/data/me/raw` — raw documents
 - `/data/me/wiki` — generated markdown notes (+ plugin config with the API key)
 - `/data/.config` — Obsidian app config (vault registration, settings)
+- `/data/.obsidian-api-key` — the Bearer key
 
 Recreating the container keeps all data.
 
@@ -58,8 +56,10 @@ Recreating the container keeps all data.
 
 ## Network
 
-Deployed on `network-docker-agent` (the docker network shared with the Hermes container and docker-agent), so Hermes terminals can reach the API directly by container IP. No Traefik route / public URL is required — this is an internal HTTP service.
+Deployed on the docker-agent networks: `network-reverse-proxy` (Traefik → public URL) + `network-docker-agent` (Hermes terminals reach the API by container IP). Public URL: `https://obsidian-http.test.legido.com`.
 
-## Next steps (planned)
+## Architecture rules (do not violate)
 
-The wiki markdown will be generated from the raw documents by Hermes in a later step (the article-based pipeline: links, PDFs, videos, transcriptions → markdown in `me/wiki`), written via the HTTP API above.
+- **No custom code in this container** — no application server, no renderer, no formatting logic. If a one-off configuration is ever needed, do it in a throwaway sidecar container, never permanently.
+- **Hermes owns the logic** — the `obsidian-ingest` skill fetches sources, stores raw copies, writes adapted wiki notes, updates the index. Obsidian only stores and exposes.
+- **The vault files are the product** — Obsidian's own UI renders them; the HTTP layer only reads/writes.
