@@ -45,9 +45,10 @@ RUN if [ "$TARGETARCH" = "amd64" ]; then \
     curl -fsSL "$URL" -o /tmp/obsidian.tar.gz && \
     mkdir -p /opt/obsidian && tar -xzf /tmp/obsidian.tar.gz -C /opt/obsidian && rm /tmp/obsidian.tar.gz
 
-# Vault HTTP API (Hermes <-> Obsidian over pure HTTP, port 27123)
-COPY vault_api.py /vault_api.py
-# Local REST API plugin (optional; requires disabling restricted mode in the UI)
+# Vault HTTP API is served by the Local REST API plugin (activated via
+# obsidian-cli in entrypoint.sh) — no custom server in this image.
+# Local REST API plugin (optional; requires disabling restricted mode, which the
+# entrypoint does programmatically via obsidian-cli)
 COPY obsidian-local-rest-api/ /opt/obsidian-local-rest-api/
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
