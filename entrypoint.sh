@@ -44,6 +44,24 @@ else
   log "obsidian.json exists (kept)"
 fi
 
+# --- Enable the command-line interface (required for obsidian-cli) ----------
+# Obsidian 1.13 stores the CLI toggle in the global obsidian.json as
+# {"cli": true} (config object D.cli); without it obsidian-cli answers
+# "Command line interface is not enabled". Enable it idempotently via python3.
+python3 - "$OBSIDIAN_CONFIG/obsidian.json" <<'PY'
+import json, sys
+p = sys.argv[1]
+try:
+    with open(p) as f:
+        d = json.load(f)
+except Exception:
+    d = {}
+d["cli"] = True
+with open(p, "w") as f:
+    json.dump(d, f)
+PY
+log "obsidian-cli enabled (cli:true set in $OBSIDIAN_CONFIG/obsidian.json)"
+
 # --- Vault HTTP API key -----------------------------------------------------
 API_KEY_FILE="$DATA_DIR/.obsidian-api-key"
 if [ -n "$OBSIDIAN_API_KEY" ]; then
