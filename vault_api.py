@@ -67,12 +67,23 @@ def inline_md(text):
     """Inline markdown with clickable links, bare URLs and #tags."""
     t = htmlmod.escape(text)
     code_spans = []
+    entities = []
 
     def hold(m):
         code_spans.append(m.group(1))
         return f"\x00C{len(code_spans) - 1}\x00"
 
+    def hold_ent(m):
+        # Protect HTML entities (e.g. &#x27; from escaped apostrophes) so the
+        # hashtag/autolink regexes below cannot match the '#' inside them.
+        entities.append(m.group(0))
+        return f"\x00E{len(entities) - 1}\x00"
+
     t = re.sub(r"`([^`]+)`", hold, t)
+    # Protect HTML entities (e.g. &#x27; from escaped apostrophes) so the
+    # hashtag/autolink regexes below cannot match the '#' inside them.
+    # Also covers double-escaped literal entities (&amp;#x27;).
+    t = re.sub(r"&(?:amp;)?(?:#[0-9]+|#[xX][0-9a-fA-F]+|[A-Za-z][A-Za-z0-9]+);", hold_ent, t)
 
     def mdlink(m):
         label, url = m.group(1), m.group(2)
@@ -91,12 +102,16 @@ def inline_md(text):
         return f'<a href="{url}">{url}</a>'
 
     t = re.sub(r"(?<![\"=])https?://[^\s<>\"()]+", autolink, t)
-    t = re.sub(r"(?<![\w\"])#([A-Za-z0-9_-]+)",
+    t = re.sub(r"(?<![\w\"&])#([A-Za-z0-9_-]+)",
                lambda m: f'<a class="tag" href="/tags/{urllib.parse.quote(m.group(1))}">#{m.group(1)}</a>', t)
+
+    def restore_ent(m):
+        return entities[int(m.group(1))]
 
     def restore(m):
         return f"<code>{code_spans[int(m.group(1))]}</code>"
 
+    t = re.sub(r"\x00E(\d+)\x00", restore_ent, t)
     t = re.sub(r"\x00C(\d+)\x00", restore, t)
     t = re.sub(r"\*\*([^*]+)\*\*", r"<strong>\1</strong>", t)
     t = re.sub(r"(?<!\*)\*([^*\n]+)\*(?!\*)", r"<em>\1</em>", t)
@@ -135,7 +150,7 @@ def extract_tags(md_text):
     if fm is not None:
         _, ts = parse_frontmatter(fm)
         tags.update(ts)
-    for m in re.finditer(r"(?<!\w)#([A-Za-z0-9_-]+)", rest or ""):
+    for m in re.finditer(r"(?<![\w&])#([A-Za-z0-9_-]+)", rest or ""):
         tags.add(m.group(1))
     return tags
 
@@ -150,7 +165,8 @@ def render_header(fm_text):
     src = fields.get("source", "")
     if src:
         if src.startswith("http"):
-            meta.append(f'Source: <a href="{src}">{src}</a>')
+            esc = htmlmod.escape(src)
+            meta.append(f'Source: <a href="{esc}">{esc}</a>')
         else:
             meta.append(f"Source: {inline_md(src)}")
     au = fields.get("author", "")
