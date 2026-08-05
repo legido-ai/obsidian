@@ -136,29 +136,31 @@ OBS_PID=$!
 log "Obsidian started (pid $OBS_PID, remote-debugging on 9222, logging on)"
 
 # --- noVNC stack (optional GUI over WebSocket, port 6080) -------------------
-# x11vnc shares the Xvfb display; websockify bridges the browser WebSocket to
-# the VNC TCP port. Password: $VNC_PASSWORD or generated (8 chars — VNC limit),
-# persisted to /data/.vncpass. Obsidian itself is untouched.
+# x0vncserver (TigerVNC) shares the Xvfb display; websockify bridges the
+# browser WebSocket to the VNC TCP port. Password: $VNC_PASSWORD or generated
+# (8 chars — VNC limit), persisted in vncpasswd format to /data/.vncpass.
+# Obsidian itself is untouched. (x11vnc was dropped: on this platform it
+# accepts connections but never sends the RFB banner.)
 VNC_PASS_FILE="$DATA_DIR/.vncpass"
 if [ -n "$VNC_PASSWORD" ]; then
   VNC_PASS="${VNC_PASSWORD:0:8}"
-  echo "$VNC_PASS" > "$VNC_PASS_FILE"
+  printf '%s' "$VNC_PASS" | vncpasswd -f > "$VNC_PASS_FILE" 2>/dev/null
   chmod 600 "$VNC_PASS_FILE"
-elif [ -f "$VNC_PASS_FILE" ]; then
-  VNC_PASS=$(cat "$VNC_PASS_FILE")
+elif [ -s "$VNC_PASS_FILE" ]; then
+  VNC_PASS="persisted"
 else
   VNC_PASS=$(tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 8)
-  echo "$VNC_PASS" > "$VNC_PASS_FILE"
+  printf '%s' "$VNC_PASS" | vncpasswd -f > "$VNC_PASS_FILE" 2>/dev/null
   chmod 600 "$VNC_PASS_FILE"
 fi
 log "noVNC password set (stored in $VNC_PASS_FILE)"
 fluxbox >> "$APP_LOG" 2>&1 &
 FB_PID=$!
-x11vnc -display :0 -forever -shared -rfbport 5900 -passwdfile "$VNC_PASS_FILE" -quiet >> "$APP_LOG" 2>&1 &
+x0vncserver -display :0 -rfbport 5900 -PasswordFile "$VNC_PASS_FILE" -SecurityTypes VncAuth >> "$APP_LOG" 2>&1 &
 X11VNC_PID=$!
 websockify --web /usr/share/novnc 6080 localhost:5900 >> "$APP_LOG" 2>&1 &
 WS_PID=$!
-log "noVNC up: fluxbox($FB_PID) x11vnc($X11VNC_PID) websockify 6080->5900($WS_PID)"
+log "noVNC up: fluxbox($FB_PID) x0vncserver($X11VNC_PID) websockify 6080->5900($WS_PID)"
 
 # --- Activate the plugin: disable Restricted Mode via obsidian-cli ----------
 # The tarball extracts to a per-arch subdirectory (obsidian-1.13.4/ on amd64,

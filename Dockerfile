@@ -18,9 +18,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     python3 \
     ca-certificates \
-    # noVNC stack (optional GUI access: Xvfb -> x11vnc -> websockify :6080)
+    # noVNC stack (optional GUI access: Xvfb -> x0vncserver -> websockify :6080)
+    # x11vnc is broken on this platform (accepts but never speaks RFB); use
+    # TigerVNC's x0vncserver (scrapes the existing X display) instead.
     fluxbox \
-    x11vnc \
+    tigervnc-standalone-server \
     novnc \
     websockify \
     # Electron runtime libraries
