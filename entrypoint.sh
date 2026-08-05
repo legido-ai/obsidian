@@ -116,10 +116,13 @@ log "env: DISPLAY=$DISPLAY XDG_CONFIG_HOME=$XDG_CONFIG_HOME HOME=$HOME XDG_RUNTI
 # Clear any stale X lock from a previous crashed boot (a docker restart keeps
 # the container filesystem, so /tmp/.X0-lock may survive an abrupt exit).
 rm -f /tmp/.X0-lock
-Xvfb :0 -screen 0 1280x800x24 -nolisten tcp >> "$APP_LOG" 2>&1 &
+# Xvnc (TigerVNC) is the X server AND the VNC server in one: Obsidian runs on
+# its display and remote clients connect to its RFB port (5900) — no display
+# sharing needed (x11vnc/x0vncserver are broken or unpackageable on this stack).
+Xvnc :0 -geometry 1280x800 -depth 24 -SecurityTypes None -rfbport 5900 -localhost no >> "$APP_LOG" 2>&1 &
 XVFB_PID=$!
 sleep 1
-log "Xvfb started (pid $XVFB_PID)"
+log "Xvnc started (pid $XVFB_PID, RFB on 5900)"
 
 OBSIDIAN_BIN=$(find /opt/obsidian -maxdepth 3 -type f -name obsidian 2>/dev/null | head -1)
 if [ -z "$OBSIDIAN_BIN" ]; then
@@ -139,18 +142,14 @@ OBS_PID=$!
 log "Obsidian started (pid $OBS_PID, remote-debugging on 9222, logging on)"
 
 # --- noVNC stack (optional GUI over WebSocket, port 6080) -------------------
-# x0vncserver (TigerVNC) shares the Xvfb display; websockify bridges the
-# browser WebSocket to the VNC TCP port. NO VNC password: the route is gated
-# by Traefik BasicAuth (same login as the wiki sidecar); vncpasswd -f hangs
-# on Ubuntu 24.04 without a tty (still prompts via /dev/tty in filter mode).
-# Obsidian itself is untouched.
+# Xvnc already serves RFB on 5900 (started above); websockify bridges the
+# browser WebSocket to it. No VNC password: the route is gated by Traefik
+# BasicAuth (same login as the wiki sidecar). Obsidian itself is untouched.
 fluxbox >> "$APP_LOG" 2>&1 &
 FB_PID=$!
-x0vncserver -display :0 -rfbport 5900 -SecurityTypes None >> "$APP_LOG" 2>&1 &
-X0VNC_PID=$!
 websockify --web /usr/share/novnc 6080 localhost:5900 >> "$APP_LOG" 2>&1 &
 WS_PID=$!
-log "noVNC up: fluxbox($FB_PID) x0vncserver($X0VNC_PID) websockify 6080->5900($WS_PID)"
+log "noVNC up: fluxbox($FB_PID) websockify 6080->5900($WS_PID)"
 
 # --- Activate the plugin: disable Restricted Mode via obsidian-cli ----------
 # The tarball extracts to a per-arch subdirectory (obsidian-1.13.4/ on amd64,
@@ -217,7 +216,7 @@ fi
 log "=== boot complete; waiting on Obsidian pid $OBS_PID ==="
 cleanup() {
   log "shutdown signal received"
-  kill "$OBS_PID" "$XVFB_PID" "$FB_PID" "$X11VNC_PID" "$WS_PID" 2>/dev/null || true
+  kill "$OBS_PID" "$XVFB_PID" "$FB_PID" "$WS_PID" 2>/dev/null || true
 }
 trap cleanup TERM INT
 
