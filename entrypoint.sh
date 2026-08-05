@@ -135,16 +135,27 @@ log "Obsidian started (pid $OBS_PID)"
 CLI_BIN=$(find /opt/obsidian -maxdepth 3 -type f -name obsidian-cli 2>/dev/null | head -1)
 if [ -x "$CLI_BIN" ]; then
   log "obsidian-cli: $CLI_BIN"
-  log "disabling Restricted Mode via obsidian-cli (up to 30 tries)"
-  for i in $(seq 1 30); do
-    if OUT=$("$CLI_BIN" plugins:restrict off 2>&1); then
-      log "obsidian-cli OK on try $i: $OUT"
-      break
-    else
-      log "obsidian-cli try $i failed: $(echo "$OUT" | head -1)"
-    fi
-    sleep 1
+  log "disabling Restricted Mode via obsidian-cli (up to 60 tries, 2s apart)"
+  CLI_OK=0
+  for i in $(seq 1 60); do
+    # The CLI exits 0 even when it prints an error, so success is detected by
+    # the output ("Restricted mode disabled. Reloading..." or "already
+    # disabled"). Early tries may report "Command ... not found" while the
+    # renderer is still initializing its command registry.
+    OUT=$("$CLI_BIN" plugins:restrict off 2>&1 || true)
+    case "$OUT" in
+      *"Restricted mode"*)
+        log "obsidian-cli OK on try $i: $(echo "$OUT" | head -1)"
+        CLI_OK=1
+        break
+        ;;
+    esac
+    log "obsidian-cli try $i: $(echo "$OUT" | head -1)"
+    sleep 2
   done
+  if [ "$CLI_OK" != "1" ]; then
+    log "WARNING: Restricted Mode could not be disabled via obsidian-cli"
+  fi
 else
   log "WARNING: obsidian-cli not found at $CLI_BIN"
 fi
