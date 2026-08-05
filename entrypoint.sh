@@ -90,12 +90,15 @@ if [ -d "$PLUGIN_SRC" ]; then
   # Plugin v5.x config schema (verified in main.js): the insecure (plain HTTP)
   # server is OFF by default and binds 127.0.0.1; enable it explicitly and bind
   # 0.0.0.0 so Traefik/network can reach it. enableSecureServer:false avoids the
-  # https server (which would throw on empty cert/key). Always overwrite so a
-  # stale v4-era data.json (enableWatch/crypto.enabled) cannot break the plugin.
+  # https server. CRITICAL: do NOT seed a crypto object — the settings tab calls
+  # pki.certificateFromPem(settings.crypto.cert) unconditionally and an empty
+  # cert throws "Invalid PEM formatted message" in onload, killing the plugin
+  # before the HTTP server starts. With crypto absent the plugin generates a
+  # valid self-signed cert itself. Always overwrite stale data.json.
   cat > "$PLUGIN_DIR/data.json" <<EOF
-{"port":27124,"insecurePort":27123,"enableInsecureServer":true,"enableSecureServer":false,"bindingHost":"0.0.0.0","apiKey":"$API_KEY","enableUserActivity":false,"crypto":{"enabled":false,"cert":"","key":"","passphrase":""}}
+{"port":27124,"insecurePort":27123,"enableInsecureServer":true,"enableSecureServer":false,"bindingHost":"0.0.0.0","apiKey":"$API_KEY","enableUserActivity":false}
 EOF
-  log "plugin data.json written (v5 schema, HTTP on 0.0.0.0:27123)"
+  log "plugin data.json written (v5 schema, HTTP on 0.0.0.0:27123, no crypto seed)"
   echo '["obsidian-local-rest-api"]' > "$WIKI_VAULT/.obsidian/community-plugins.json"
   log "community-plugins.json seeded"
 else
