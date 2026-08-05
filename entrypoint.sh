@@ -126,9 +126,11 @@ log "obsidian-cli present: $([ -x /opt/obsidian/obsidian-cli ] && echo yes || ec
 log "plugin files: $(ls "$PLUGIN_DIR" 2>/dev/null | tr '\n' ' ')"
 
 echo "--- Obsidian app output follows ---" >> "$APP_LOG"
-"$OBSIDIAN_BIN" --no-sandbox --disable-gpu --disable-dev-shm-usage --remote-debugging-port=9222 "$WIKI_VAULT" >> "$APP_LOG" 2>&1 &
+# --enable-logging pipes the renderer console (plugin errors) to stderr,
+# which we capture in $APP_LOG.
+"$OBSIDIAN_BIN" --no-sandbox --disable-gpu --disable-dev-shm-usage --enable-logging --remote-debugging-port=9222 "$WIKI_VAULT" >> "$APP_LOG" 2>&1 &
 OBS_PID=$!
-log "Obsidian started (pid $OBS_PID, remote-debugging on 9222)"
+log "Obsidian started (pid $OBS_PID, remote-debugging on 9222, logging on)"
 
 # --- Activate the plugin: disable Restricted Mode via obsidian-cli ----------
 # The tarball extracts to a per-arch subdirectory (obsidian-1.13.4/ on amd64,
