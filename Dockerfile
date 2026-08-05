@@ -55,7 +55,10 @@ RUN chmod +x /entrypoint.sh
 
 EXPOSE 27123
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
-  CMD curl -s -o /dev/null http://localhost:27123/ || exit 1
+# No HEALTHCHECK: the container is deliberately reachable for diagnosis even
+# while the plugin HTTP server is down (a failing healthcheck makes Traefik
+# skip the container, hiding it from the reverse proxy entirely).
+# HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+#   CMD curl -s -o /dev/null http://localhost:27123/ || exit 1
 
 CMD ["/entrypoint.sh"]
