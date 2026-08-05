@@ -14,13 +14,12 @@ ENV DEBIAN_FRONTEND=noninteractive
 ENV OBSIDIAN_VERSION=1.13.4
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    xvfb \
     curl \
     python3 \
     ca-certificates \
-    # noVNC stack (optional GUI access: Xvfb -> x0vncserver -> websockify :6080)
-    # x11vnc is broken on this platform (accepts but never speaks RFB); use
-    # TigerVNC's x0vncserver (scrapes the existing X display) instead.
+    # Display + GUI access: Xvnc (TigerVNC) is the X server AND the VNC
+    # server (RFB :5900); websockify bridges the browser WebSocket (noVNC
+    # client) to it; fluxbox is a minimal window manager for Obsidian.
     fluxbox \
     tigervnc-standalone-server \
     novnc \
@@ -63,6 +62,7 @@ RUN chmod +x /entrypoint.sh
 
 EXPOSE 27123
 EXPOSE 6080
+EXPOSE 8080
 
 # No HEALTHCHECK: the container is deliberately reachable for diagnosis even
 # while the plugin HTTP server is down (a failing healthcheck makes Traefik
