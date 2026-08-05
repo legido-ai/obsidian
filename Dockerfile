@@ -50,6 +50,7 @@ RUN if [ "$TARGETARCH" = "amd64" ]; then \
 # Local REST API plugin (optional; requires disabling restricted mode, which the
 # entrypoint does programmatically via obsidian-cli)
 COPY obsidian-local-rest-api/ /opt/obsidian-local-rest-api/
+COPY cdp_capture.py /cdp_capture.py
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 

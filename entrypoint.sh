@@ -183,6 +183,17 @@ for i in $(seq 1 60); do
 done
 log "plugin wait loop finished (last try $i, port_open=$PORT_OK)"
 
+# --- Capture the renderer console via CDP (plugin load errors) ---------------
+if [ "$PORT_OK" != "1" ]; then
+  log "capturing renderer console via CDP (plugin did not open 27123)..."
+  if [ -f /cdp_capture.py ]; then
+    python3 /cdp_capture.py >> "$BOOT_LOG" 2>&1 || log "cdp capture failed (rc=$?)"
+    log "cdp capture finished; see /data/cdp.log"
+  else
+    log "WARNING: /cdp_capture.py missing"
+  fi
+fi
+
 log "=== boot complete; waiting on Obsidian pid $OBS_PID ==="
 cleanup() {
   log "shutdown signal received"
