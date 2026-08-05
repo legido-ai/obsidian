@@ -157,22 +157,29 @@ if [ -x "$CLI_BIN" ]; then
   if [ "$CLI_OK" != "1" ]; then
     log "WARNING: Restricted Mode could not be disabled via obsidian-cli"
   fi
-  log "cli plugins:enabled => $(echo "$("$CLI_BIN" plugins:enabled 2>&1 | head -8)" | tr '\n' '|')"
-  log "cli help (first 12) => $(echo "$("$CLI_BIN" help 2>&1 | head -12)" | tr '\n' '|')"
+  log "cli plugins:enabled => $(echo "$("$CLI_BIN" plugins:enabled format=json 2>&1 | head -40)" | tr '\n' ' ')"
+  log "cli plugin info => $(echo "$("$CLI_BIN" plugin id=obsidian-local-rest-api 2>&1 | head -6)" | tr '\n' '|')"
+  log "cli help => $(echo "$("$CLI_BIN" help 2>&1 | head -40)" | tr '\n' '|')"
 else
   log "WARNING: obsidian-cli not found at $CLI_BIN"
 fi
 
 # --- Wait for the plugin HTTP surface on 27123 ------------------------------
 log "waiting for plugin HTTP on 127.0.0.1:27123 (up to 60s)"
+PORT_OK=0
 for i in $(seq 1 60); do
+  if (exec 3<>/dev/tcp/127.0.0.1/27123) 2>/dev/null; then
+    exec 3>&- 3<&-
+    PORT_OK=1
+    log "port 27123 OPEN on try $i"
+  fi
   if curl -s -o /dev/null -m 2 -H "Authorization: Bearer $API_KEY" "http://127.0.0.1:27123/active"; then
     log "plugin HTTP responding on try $i"
     break
   fi
   sleep 1
 done
-log "plugin wait loop finished (last try $i)"
+log "plugin wait loop finished (last try $i, port_open=$PORT_OK)"
 
 log "=== boot complete; waiting on Obsidian pid $OBS_PID ==="
 cleanup() {
