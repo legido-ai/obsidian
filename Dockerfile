@@ -18,6 +18,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     python3 \
     ca-certificates \
+    # noVNC stack (optional GUI access: Xvfb -> x11vnc -> websockify :6080)
+    fluxbox \
+    x11vnc \
+    novnc \
+    websockify \
     # Electron runtime libraries
     libgtk-3-0 \
     libnss3 \
@@ -55,6 +60,7 @@ COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
 EXPOSE 27123
+EXPOSE 6080
 
 # No HEALTHCHECK: the container is deliberately reachable for diagnosis even
 # while the plugin HTTP server is down (a failing healthcheck makes Traefik

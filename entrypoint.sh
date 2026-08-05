@@ -135,6 +135,31 @@ echo "--- Obsidian app output follows ---" >> "$APP_LOG"
 OBS_PID=$!
 log "Obsidian started (pid $OBS_PID, remote-debugging on 9222, logging on)"
 
+# --- noVNC stack (optional GUI over WebSocket, port 6080) -------------------
+# x11vnc shares the Xvfb display; websockify bridges the browser WebSocket to
+# the VNC TCP port. Password: $VNC_PASSWORD or generated (8 chars — VNC limit),
+# persisted to /data/.vncpass. Obsidian itself is untouched.
+VNC_PASS_FILE="$DATA_DIR/.vncpass"
+if [ -n "$VNC_PASSWORD" ]; then
+  VNC_PASS="${VNC_PASSWORD:0:8}"
+  echo "$VNC_PASS" > "$VNC_PASS_FILE"
+  chmod 600 "$VNC_PASS_FILE"
+elif [ -f "$VNC_PASS_FILE" ]; then
+  VNC_PASS=$(cat "$VNC_PASS_FILE")
+else
+  VNC_PASS=$(tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 8)
+  echo "$VNC_PASS" > "$VNC_PASS_FILE"
+  chmod 600 "$VNC_PASS_FILE"
+fi
+log "noVNC password set (stored in $VNC_PASS_FILE)"
+fluxbox >> "$APP_LOG" 2>&1 &
+FB_PID=$!
+x11vnc -display :0 -forever -shared -rfbport 5900 -passwdfile "$VNC_PASS_FILE" -quiet >> "$APP_LOG" 2>&1 &
+X11VNC_PID=$!
+websockify --web /usr/share/novnc 6080 localhost:5900 >> "$APP_LOG" 2>&1 &
+WS_PID=$!
+log "noVNC up: fluxbox($FB_PID) x11vnc($X11VNC_PID) websockify 6080->5900($WS_PID)"
+
 # --- Activate the plugin: disable Restricted Mode via obsidian-cli ----------
 # The tarball extracts to a per-arch subdirectory (obsidian-1.13.4/ on amd64,
 # obsidian-1.13.4-arm64/ on arm64), so locate the CLI dynamically like the app.
@@ -200,7 +225,7 @@ fi
 log "=== boot complete; waiting on Obsidian pid $OBS_PID ==="
 cleanup() {
   log "shutdown signal received"
-  kill "$OBS_PID" "$XVFB_PID" 2>/dev/null || true
+  kill "$OBS_PID" "$XVFB_PID" "$FB_PID" "$X11VNC_PID" "$WS_PID" 2>/dev/null || true
 }
 trap cleanup TERM INT
 
