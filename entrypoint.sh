@@ -87,14 +87,15 @@ PLUGIN_DIR="$WIKI_VAULT/.obsidian/plugins/$PLUGIN_ID"
 if [ -d "$PLUGIN_SRC" ]; then
   mkdir -p "$PLUGIN_DIR"
   cp -f "$PLUGIN_SRC/main.js" "$PLUGIN_SRC/manifest.json" "$PLUGIN_SRC/styles.css" "$PLUGIN_DIR/" 2>/dev/null || true
-  if [ ! -f "$PLUGIN_DIR/data.json" ]; then
-    cat > "$PLUGIN_DIR/data.json" <<EOF
-{"port":27123,"apiKey":"$API_KEY","enableWatch":true,"crypto":{"enabled":false,"cert":"","key":"","passphrase":""},"enableUserActivity":false}
+  # Plugin v5.x config schema (verified in main.js): the insecure (plain HTTP)
+  # server is OFF by default and binds 127.0.0.1; enable it explicitly and bind
+  # 0.0.0.0 so Traefik/network can reach it. enableSecureServer:false avoids the
+  # https server (which would throw on empty cert/key). Always overwrite so a
+  # stale v4-era data.json (enableWatch/crypto.enabled) cannot break the plugin.
+  cat > "$PLUGIN_DIR/data.json" <<EOF
+{"port":27124,"insecurePort":27123,"enableInsecureServer":true,"enableSecureServer":false,"bindingHost":"0.0.0.0","apiKey":"$API_KEY","enableUserActivity":false,"crypto":{"enabled":false,"cert":"","key":"","passphrase":""}}
 EOF
-    log "plugin data.json written (fresh)"
-  else
-    log "plugin data.json exists (kept)"
-  fi
+  log "plugin data.json written (v5 schema, HTTP on 0.0.0.0:27123)"
   echo '["obsidian-local-rest-api"]' > "$WIKI_VAULT/.obsidian/community-plugins.json"
   log "community-plugins.json seeded"
 else
