@@ -113,6 +113,9 @@ export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/tmp/obsidian-runtime}"
 mkdir -p "$XDG_RUNTIME_DIR" && chmod 700 "$XDG_RUNTIME_DIR"
 log "env: DISPLAY=$DISPLAY XDG_CONFIG_HOME=$XDG_CONFIG_HOME HOME=$HOME XDG_RUNTIME_DIR=$XDG_RUNTIME_DIR"
 
+# Clear any stale X lock from a previous crashed boot (a docker restart keeps
+# the container filesystem, so /tmp/.X0-lock may survive an abrupt exit).
+rm -f /tmp/.X0-lock
 Xvfb :0 -screen 0 1280x800x24 -nolisten tcp >> "$APP_LOG" 2>&1 &
 XVFB_PID=$!
 sleep 1
@@ -137,30 +140,17 @@ log "Obsidian started (pid $OBS_PID, remote-debugging on 9222, logging on)"
 
 # --- noVNC stack (optional GUI over WebSocket, port 6080) -------------------
 # x0vncserver (TigerVNC) shares the Xvfb display; websockify bridges the
-# browser WebSocket to the VNC TCP port. Password: $VNC_PASSWORD or generated
-# (8 chars — VNC limit), persisted in vncpasswd format to /data/.vncpass.
-# Obsidian itself is untouched. (x11vnc was dropped: on this platform it
-# accepts connections but never sends the RFB banner.)
-VNC_PASS_FILE="$DATA_DIR/.vncpass"
-if [ -n "$VNC_PASSWORD" ]; then
-  VNC_PASS="${VNC_PASSWORD:0:8}"
-  printf '%s' "$VNC_PASS" | vncpasswd -f > "$VNC_PASS_FILE" 2>/dev/null
-  chmod 600 "$VNC_PASS_FILE"
-elif [ -s "$VNC_PASS_FILE" ]; then
-  VNC_PASS="persisted"
-else
-  VNC_PASS=$(tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 8)
-  printf '%s' "$VNC_PASS" | vncpasswd -f > "$VNC_PASS_FILE" 2>/dev/null
-  chmod 600 "$VNC_PASS_FILE"
-fi
-log "noVNC password set (stored in $VNC_PASS_FILE)"
+# browser WebSocket to the VNC TCP port. NO VNC password: the route is gated
+# by Traefik BasicAuth (same login as the wiki sidecar); vncpasswd -f hangs
+# on Ubuntu 24.04 without a tty (still prompts via /dev/tty in filter mode).
+# Obsidian itself is untouched.
 fluxbox >> "$APP_LOG" 2>&1 &
 FB_PID=$!
-x0vncserver -display :0 -rfbport 5900 -PasswordFile "$VNC_PASS_FILE" -SecurityTypes VncAuth >> "$APP_LOG" 2>&1 &
-X11VNC_PID=$!
+x0vncserver -display :0 -rfbport 5900 -SecurityTypes None >> "$APP_LOG" 2>&1 &
+X0VNC_PID=$!
 websockify --web /usr/share/novnc 6080 localhost:5900 >> "$APP_LOG" 2>&1 &
 WS_PID=$!
-log "noVNC up: fluxbox($FB_PID) x0vncserver($X11VNC_PID) websockify 6080->5900($WS_PID)"
+log "noVNC up: fluxbox($FB_PID) x0vncserver($X0VNC_PID) websockify 6080->5900($WS_PID)"
 
 # --- Activate the plugin: disable Restricted Mode via obsidian-cli ----------
 # The tarball extracts to a per-arch subdirectory (obsidian-1.13.4/ on amd64,
