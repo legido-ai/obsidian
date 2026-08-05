@@ -126,9 +126,9 @@ log "obsidian-cli present: $([ -x /opt/obsidian/obsidian-cli ] && echo yes || ec
 log "plugin files: $(ls "$PLUGIN_DIR" 2>/dev/null | tr '\n' ' ')"
 
 echo "--- Obsidian app output follows ---" >> "$APP_LOG"
-"$OBSIDIAN_BIN" --no-sandbox --disable-gpu --disable-dev-shm-usage "$WIKI_VAULT" >> "$APP_LOG" 2>&1 &
+"$OBSIDIAN_BIN" --no-sandbox --disable-gpu --disable-dev-shm-usage --remote-debugging-port=9222 "$WIKI_VAULT" >> "$APP_LOG" 2>&1 &
 OBS_PID=$!
-log "Obsidian started (pid $OBS_PID)"
+log "Obsidian started (pid $OBS_PID, remote-debugging on 9222)"
 
 # --- Activate the plugin: disable Restricted Mode via obsidian-cli ----------
 # The tarball extracts to a per-arch subdirectory (obsidian-1.13.4/ on amd64,
@@ -157,6 +157,8 @@ if [ -x "$CLI_BIN" ]; then
   if [ "$CLI_OK" != "1" ]; then
     log "WARNING: Restricted Mode could not be disabled via obsidian-cli"
   fi
+  log "cli plugins:enabled => $(echo "$("$CLI_BIN" plugins:enabled 2>&1 | head -8)" | tr '\n' '|')"
+  log "cli help (first 12) => $(echo "$("$CLI_BIN" help 2>&1 | head -12)" | tr '\n' '|')"
 else
   log "WARNING: obsidian-cli not found at $CLI_BIN"
 fi
