@@ -151,6 +151,14 @@ websockify --web /usr/share/novnc 6080 localhost:5900 >> "$APP_LOG" 2>&1 &
 WS_PID=$!
 log "noVNC up: fluxbox($FB_PID) websockify 6080->5900($WS_PID)"
 
+# --- Read-only static server (wiki viewer + vault files), port 8080 ---------
+# Stock python http.server — no custom code. Serves the volume root (/data)
+# so the wiki viewer (me/wiki/viewer/index.html) and the files are browsable.
+# The route is gated by Traefik BasicAuth like the VNC route.
+python3 -m http.server 8080 --directory "$DATA_DIR" --bind 0.0.0.0 >> "$APP_LOG" 2>&1 &
+HTTP_PID=$!
+log "static server up on 8080 (pid $HTTP_PID)"
+
 # --- Activate the plugin: disable Restricted Mode via obsidian-cli ----------
 # The tarball extracts to a per-arch subdirectory (obsidian-1.13.4/ on amd64,
 # obsidian-1.13.4-arm64/ on arm64), so locate the CLI dynamically like the app.
@@ -216,7 +224,7 @@ fi
 log "=== boot complete; waiting on Obsidian pid $OBS_PID ==="
 cleanup() {
   log "shutdown signal received"
-  kill "$OBS_PID" "$XVFB_PID" "$FB_PID" "$WS_PID" 2>/dev/null || true
+  kill "$OBS_PID" "$XVFB_PID" "$FB_PID" "$WS_PID" "$HTTP_PID" 2>/dev/null || true
 }
 trap cleanup TERM INT
 
