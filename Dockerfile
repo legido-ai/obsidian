@@ -60,8 +60,10 @@ COPY cdp_capture.py /cdp_capture.py
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
-EXPOSE 27123   # Local REST API plugin (Bearer)
-EXPOSE 6080    # noVNC — the real Obsidian GUI (WebSocket)
+# Local REST API plugin (Bearer)
+EXPOSE 27123
+# noVNC — the real Obsidian GUI (WebSocket)
+EXPOSE 6080
 
 # No HEALTHCHECK: the container is deliberately reachable for diagnosis even
 # while the plugin HTTP server is down (a failing healthcheck makes Traefik
