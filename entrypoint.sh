@@ -152,10 +152,9 @@ WS_PID=$!
 log "noVNC up: fluxbox($FB_PID) websockify 6080->5900($WS_PID)"
 
 # --- Read-only static server (wiki viewer + vault files), port 8080 ---------
-# Stock python http.server — no custom code. Serves the volume root (/data)
-# so the wiki viewer (me/wiki/viewer/index.html) and the files are browsable.
-# The route is gated by Traefik BasicAuth like the VNC route.
-python3 -m http.server 8080 --directory "$DATA_DIR" --bind 0.0.0.0 >> "$APP_LOG" 2>&1 &
+# serve.py = stock http.server + one rule: .md URLs (no ?raw=1) redirect to
+# the wiki viewer, so ANY markdown link opens rendered. No other logic.
+python3 /serve.py 8080 "$DATA_DIR" >> "$APP_LOG" 2>&1 &
 HTTP_PID=$!
 log "static server up on 8080 (pid $HTTP_PID)"
 

@@ -57,6 +57,7 @@ RUN if [ "$TARGETARCH" = "amd64" ]; then \
 # entrypoint does programmatically via obsidian-cli)
 COPY obsidian-local-rest-api/ /opt/obsidian-local-rest-api/
 COPY cdp_capture.py /cdp_capture.py
+COPY serve.py /serve.py
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
