@@ -57,13 +57,11 @@ RUN if [ "$TARGETARCH" = "amd64" ]; then \
 # entrypoint does programmatically via obsidian-cli)
 COPY obsidian-local-rest-api/ /opt/obsidian-local-rest-api/
 COPY cdp_capture.py /cdp_capture.py
-COPY serve.py /serve.py
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
-EXPOSE 27123
-EXPOSE 6080
-EXPOSE 8080
+EXPOSE 27123   # Local REST API plugin (Bearer)
+EXPOSE 6080    # noVNC — the real Obsidian GUI (WebSocket)
 
 # No HEALTHCHECK: the container is deliberately reachable for diagnosis even
 # while the plugin HTTP server is down (a failing healthcheck makes Traefik

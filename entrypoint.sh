@@ -141,22 +141,16 @@ echo "--- Obsidian app output follows ---" >> "$APP_LOG"
 OBS_PID=$!
 log "Obsidian started (pid $OBS_PID, remote-debugging on 9222, logging on)"
 
-# --- noVNC stack (optional GUI over WebSocket, port 6080) -------------------
+# --- noVNC stack (GUI over WebSocket, port 6080) ----------------------------
 # Xvnc already serves RFB on 5900 (started above); websockify bridges the
 # browser WebSocket to it. No VNC password: the route is gated by Traefik
-# BasicAuth (same login as the wiki sidecar). Obsidian itself is untouched.
+# BasicAuth. Obsidian itself is untouched — all rendering happens inside the
+# real app. No viewer, no markdown renderer, no custom code.
 fluxbox >> "$APP_LOG" 2>&1 &
 FB_PID=$!
 websockify --web /usr/share/novnc 6080 localhost:5900 >> "$APP_LOG" 2>&1 &
 WS_PID=$!
 log "noVNC up: fluxbox($FB_PID) websockify 6080->5900($WS_PID)"
-
-# --- Read-only static server (wiki viewer + vault files), port 8080 ---------
-# serve.py = stock http.server + one rule: .md URLs (no ?raw=1) redirect to
-# the wiki viewer, so ANY markdown link opens rendered. No other logic.
-python3 /serve.py 8080 "$DATA_DIR" >> "$APP_LOG" 2>&1 &
-HTTP_PID=$!
-log "static server up on 8080 (pid $HTTP_PID)"
 
 # --- Activate the plugin: disable Restricted Mode via obsidian-cli ----------
 # The tarball extracts to a per-arch subdirectory (obsidian-1.13.4/ on amd64,
@@ -223,7 +217,7 @@ fi
 log "=== boot complete; waiting on Obsidian pid $OBS_PID ==="
 cleanup() {
   log "shutdown signal received"
-  kill "$OBS_PID" "$XVFB_PID" "$FB_PID" "$WS_PID" "$HTTP_PID" 2>/dev/null || true
+  kill "$OBS_PID" "$XVFB_PID" "$FB_PID" "$WS_PID" 2>/dev/null || true
 }
 trap cleanup TERM INT
 
