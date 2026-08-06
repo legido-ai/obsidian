@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Obsidian</title>
+<style>html,body{margin:0;height:100%;background:#1e1e1e;font-family:-apple-system,sans-serif;color:#ccc}</style>
+</head>
+<body>
+<script src="core/rfb.js"></script>
+<script>
+(function () {
+  var target = document.body;
+  var url = "wss://" + location.host + "/websockify";
+  var rfb;
+  try {
+    rfb = new RFB(target, url, {});
+  } catch (e) {
+    target.textContent = "Connection error: " + e.message;
+    return;
+  }
+  rfb.scaleViewport = true;
+  rfb.resizeSession = false;
+  rfb.showDotCursor = true;
+})();
+</script>
+</body>
+</html>
